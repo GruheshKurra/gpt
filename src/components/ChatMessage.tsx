@@ -6,8 +6,9 @@ import { useEffect, useState } from "react";
 
 interface Message {
   id: string;
-  role: "user" | "assistant";
+  role: "user" | "assistant" | "system";
   content: string;
+  images?: string[];
 }
 
 interface ChatMessageProps {
@@ -167,6 +168,23 @@ const ChatMessage = ({ message }: ChatMessageProps) => {
           </Avatar>
         )}
       </div>
+
+      {/* Display images if they exist */}
+      {message.images && message.images.length > 0 && (
+        <div className="grid grid-cols-2 gap-2 mt-2 sm:grid-cols-3 md:grid-cols-4">
+          {message.images.map((src, index) => (
+            <div key={index} className="relative rounded-md overflow-hidden border">
+              <img 
+                src={src} 
+                alt={`Uploaded image ${index + 1}`} 
+                className="w-full h-auto object-cover aspect-square"
+                onClick={() => window.open(src, '_blank')}
+                style={{ cursor: 'pointer' }}
+              />
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 };
