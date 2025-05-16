@@ -15,13 +15,25 @@ interface Message {
   content: string;
 }
 
+const DEFAULT_API_KEY = "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";
+
 const Chat = () => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const [apiKey, setApiKey] = useState<string | null>(localStorage.getItem("openrouter-api-key"));
+  const [apiKey, setApiKey] = useState<string | null>(
+    localStorage.getItem("openrouter-api-key") || DEFAULT_API_KEY
+  );
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
+
+  useEffect(() => {
+    // Set the default API key in localStorage if not already set
+    if (!localStorage.getItem("openrouter-api-key") && DEFAULT_API_KEY) {
+      localStorage.setItem("openrouter-api-key", DEFAULT_API_KEY);
+      setApiKey(DEFAULT_API_KEY);
+    }
+  }, []);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -106,9 +118,7 @@ const Chat = () => {
       <header className="flex justify-between items-center p-4 bg-white border-b">
         <h1 className="text-xl font-bold text-gray-900">AI Chat Assistant</h1>
         <div className="flex items-center gap-4">
-          {!apiKey && (
-            <OpenRouterKeyForm onSave={saveApiKey} />
-          )}
+          <OpenRouterKeyForm onSave={saveApiKey} defaultKey={apiKey || undefined} />
           <UserButton afterSignOutUrl="/" />
         </div>
       </header>

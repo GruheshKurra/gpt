@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -15,11 +15,18 @@ import { Label } from "@/components/ui/label";
 
 interface OpenRouterKeyFormProps {
   onSave: (key: string) => void;
+  defaultKey?: string;
 }
 
-const OpenRouterKeyForm = ({ onSave }: OpenRouterKeyFormProps) => {
-  const [apiKey, setApiKey] = useState("");
+const OpenRouterKeyForm = ({ onSave, defaultKey }: OpenRouterKeyFormProps) => {
+  const [apiKey, setApiKey] = useState(defaultKey || "");
   const [open, setOpen] = useState(false);
+
+  useEffect(() => {
+    if (defaultKey && defaultKey.trim()) {
+      setApiKey(defaultKey.trim());
+    }
+  }, [defaultKey]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
