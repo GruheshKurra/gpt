@@ -1,12 +1,22 @@
-// Update this page (the content is just a fallback if you fail to update the page)
+
+import { SignIn, SignedIn, SignedOut } from "@clerk/clerk-react";
+import { Navigate } from "react-router-dom";
 
 const Index = () => {
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-100">
-      <div className="text-center">
-        <h1 className="text-4xl font-bold mb-4">Welcome to Your Blank App</h1>
-        <p className="text-xl text-gray-600">Start building your amazing project here!</p>
-      </div>
+    <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50">
+      <SignedIn>
+        <Navigate to="/chat" replace />
+      </SignedIn>
+      <SignedOut>
+        <div className="text-center mb-8">
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">AI Chat Assistant</h1>
+          <p className="text-gray-600">Powered by Llama 3.3</p>
+        </div>
+        <div className="w-full max-w-md bg-white rounded-lg shadow-md overflow-hidden">
+          <SignIn routing="path" path="/" />
+        </div>
+      </SignedOut>
     </div>
   );
 };
