@@ -21,7 +21,7 @@ export default defineConfig(({ mode }) => ({
       manifest: {
         name: 'AI Chat Assistant',
         short_name: 'AI Chat',
-        description: 'AI Chat Assistant powered by Llama 3.3',
+        description: 'AI Chat Assistant powered by ',
         theme_color: '#6366F1',
         background_color: '#F9FAFB',
         display: 'standalone',

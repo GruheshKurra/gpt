@@ -44,23 +44,9 @@ const OpenRouterKeyForm = ({ onSave, defaultKey }: OpenRouterKeyFormProps) => {
       <DialogContent className="sm:max-w-md">
         <form onSubmit={handleSubmit}>
           <DialogHeader>
-            <DialogTitle>OpenRouter API Key</DialogTitle>
-            <DialogDescription>
-              Enter your OpenRouter API key to use the chat. You can get a free API key from{" "}
-              <a 
-                href="https://openrouter.ai/" 
-                target="_blank" 
-                rel="noopener noreferrer"
-                className="text-primary underline"
-              >
-                openrouter.ai
-              </a>
-            </DialogDescription>
+            <DialogTitle>API Key</DialogTitle>
           </DialogHeader>
           <div className="py-4">
-            <Label htmlFor="api-key" className="mb-2 block">
-              API Key
-            </Label>
             <Input
               id="api-key"
               value={apiKey}
