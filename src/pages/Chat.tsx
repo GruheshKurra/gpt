@@ -6,8 +6,14 @@ import { Input } from "@/components/ui/input";
 import { useToast } from "@/components/ui/use-toast";
 import { Send } from "lucide-react";
 import ChatMessage from "@/components/ChatMessage";
-import OpenRouterKeyForm from "@/components/OpenRouterKeyForm";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 interface Message {
   id: string;
@@ -15,25 +21,40 @@ interface Message {
   content: string;
 }
 
-const DEFAULT_API_KEY = "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";
+interface Model {
+  name: string;
+  id: string;
+  context: number;
+}
+
+const API_KEY = "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";
+
+const AVAILABLE_MODELS: Model[] = [
+  {
+    name: "Meta: Llama 3.3 8B Instruct",
+    id: "meta-llama/llama-3.3-8b-instruct:free",
+    context: 12800
+  },
+  {
+    name: "Nous: DeepHermes 3 Mistral 24B Preview",
+    id: "nousresearch/deephermes-3-mistral-24b-preview:free",
+    context: 32768
+  },
+  // Add all other models here...
+  {
+    name: "Meta: Llama 3.3 70B Instruct",
+    id: "meta-llama/llama-3.3-70b-instruct:free",
+    context: 131072
+  }
+];
 
 const Chat = () => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const [apiKey, setApiKey] = useState<string | null>(
-    localStorage.getItem("openrouter-api-key") || DEFAULT_API_KEY
-  );
+  const [selectedModel, setSelectedModel] = useState<string>(AVAILABLE_MODELS[0].id);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
-
-  useEffect(() => {
-    // Set the default API key in localStorage if not already set
-    if (!localStorage.getItem("openrouter-api-key") && DEFAULT_API_KEY) {
-      localStorage.setItem("openrouter-api-key", DEFAULT_API_KEY);
-      setApiKey(DEFAULT_API_KEY);
-    }
-  }, []);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -46,15 +67,6 @@ const Chat = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!input.trim() || isLoading) return;
-    
-    if (!apiKey) {
-      toast({
-        title: "API Key Missing",
-        description: "Please enter your  first.",
-        variant: "destructive"
-      });
-      return;
-    }
 
     // Add user message
     const userMessage = { id: Date.now().toString(), role: "user" as const, content: input };
@@ -67,12 +79,12 @@ const Chat = () => {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "Authorization": `Bearer ${apiKey}`,
+          "Authorization": `Bearer ${API_KEY}`,
           "HTTP-Referer": window.location.origin,
           "X-Title": "AI Chat Assistant"
         },
         body: JSON.stringify({
-          model: "meta-llama/llama-3.3-70b-instruct:free",
+          model: selectedModel,
           messages: [
             ...messages.map(({ role, content }) => ({ role, content })),
             { role: userMessage.role, content: userMessage.content }
@@ -104,15 +116,6 @@ const Chat = () => {
     }
   };
 
-  const saveApiKey = (key: string) => {
-    localStorage.setItem("openrouter-api-key", key);
-    setApiKey(key);
-    toast({
-      title: "API Key Saved",
-      description: "Your  has been saved.",
-    });
-  };
-
   return (
     <div className="flex flex-col h-screen bg-background">
       <header className="flex justify-between items-center p-4 border-b bg-card">
@@ -124,7 +127,18 @@ const Chat = () => {
             <h1 className="text-xl font-bold">AI Chat Assistant</h1>
           </div>
           <div className="flex items-center gap-4">
-            <OpenRouterKeyForm onSave={saveApiKey} defaultKey={apiKey || undefined} />
+            <Select value={selectedModel} onValueChange={setSelectedModel}>
+              <SelectTrigger className="w-[300px]">
+                <SelectValue placeholder="Select a model" />
+              </SelectTrigger>
+              <SelectContent>
+                {AVAILABLE_MODELS.map((model) => (
+                  <SelectItem key={model.id} value={model.id}>
+                    {model.name} ({model.context.toLocaleString()} tokens)
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
             <ThemeToggle />
             <UserButton afterSignOutUrl="/" />
           </div>
@@ -176,11 +190,11 @@ const Chat = () => {
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
                   className="flex-1 bg-background"
-                  disabled={isLoading || !apiKey}
+                  disabled={isLoading}
                 />
                 <Button 
                   type="submit" 
-                  disabled={isLoading || !apiKey || !input.trim()}
+                  disabled={isLoading || !input.trim()}
                   className="px-6 shrink-0"
                 >
                   {isLoading ? (
