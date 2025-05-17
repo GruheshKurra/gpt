@@ -818,7 +818,7 @@ const Chat = () => {
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 className="pr-12 py-6 text-base"
-                disabled={isLoading}
+                disabled={isLoading} 
               />
               <Button 
                 type="submit" 
