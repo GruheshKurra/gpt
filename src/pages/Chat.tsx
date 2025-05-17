@@ -628,7 +628,7 @@ const Chat = () => {
                   <DropdownMenuLabel>Settings</DropdownMenuLabel>
                   <DropdownMenuSeparator />
                   
-                  <div className="p-2">
+                  {/* <div className="p-2">
                     <div className="flex items-center justify-between mb-2">
                       <Label htmlFor="dropdown-streaming" className="text-xs">
                         Streaming
@@ -656,7 +656,7 @@ const Chat = () => {
                         className="w-full"
                       />
                     </div>
-                  </div>
+                  </div> */}
                   
                   <DropdownMenuSeparator />
                   <DropdownMenuGroup>
