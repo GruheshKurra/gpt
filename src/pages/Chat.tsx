@@ -1,3 +1,4 @@
+
 import React, { useState, useRef, useEffect, useCallback } from "react";
 import { useToast } from "@/components/ui/use-toast";
 import {
@@ -69,7 +70,7 @@ const Chat = () => {
   const [reasoningEnabled, setReasoningEnabled] = useState(false);
   const [autoEnableReasoning, setAutoEnableReasoning] = useState(true);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
   const { toast } = useToast();
   const [expandedCategories, setExpandedCategories] = useState<Record<string, boolean>>({
     Popular: true,
@@ -238,6 +239,11 @@ const Chat = () => {
         msg.id === id ? { ...msg, isReasoningExpanded: !msg.isReasoningExpanded } : msg
       )
     );
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    sendMessage();
   };
 
   return (

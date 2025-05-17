@@ -4,19 +4,25 @@ import ReactMarkdown from "react-markdown";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { cn } from "@/lib/utils";
 import { useEffect, useState } from "react";
+import { ChevronDown, ChevronUp } from "lucide-react";
+import { Button } from "@/components/ui/button"; 
 
 interface Message {
   id: string;
   role: "user" | "assistant" | "system";
   content: string;
   images?: string[];
+  reasoning?: boolean;
+  reasoningSteps?: string;
+  isReasoningExpanded?: boolean;
 }
 
 interface ChatMessageProps {
   message: Message;
+  onToggleReasoning?: (id: string) => void;
 }
 
-const ChatMessage = ({ message }: ChatMessageProps) => {
+const ChatMessage = ({ message, onToggleReasoning }: ChatMessageProps) => {
   const { user } = useUser();
   const isUser = message.role === "user";
   const [displayedContent, setDisplayedContent] = useState("");
@@ -159,6 +165,35 @@ const ChatMessage = ({ message }: ChatMessageProps) => {
               )}
             </div>
           )}
+
+          {!isUser && message.reasoning && message.reasoningSteps && (
+            <div className="mt-3 pt-3 border-t border-border/30">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="flex items-center gap-1 text-xs text-muted-foreground"
+                onClick={() => onToggleReasoning && onToggleReasoning(message.id)}
+              >
+                {message.isReasoningExpanded ? (
+                  <>
+                    <ChevronUp className="h-3 w-3" /> Hide reasoning
+                  </>
+                ) : (
+                  <>
+                    <ChevronDown className="h-3 w-3" /> Show reasoning
+                  </>
+                )}
+              </Button>
+              
+              {message.isReasoningExpanded && (
+                <div className="mt-2 pl-2 border-l-2 border-muted">
+                  <ReactMarkdown components={markdownComponents} className="text-sm text-muted-foreground">
+                    {message.reasoningSteps}
+                  </ReactMarkdown>
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         {isUser && (
@@ -175,7 +210,6 @@ const ChatMessage = ({ message }: ChatMessageProps) => {
         )}
       </div>
 
-      {/* Display images if they exist */}
       {message.images && message.images.length > 0 && (
         <div className="grid grid-cols-2 gap-2 mt-2 sm:grid-cols-3 md:grid-cols-4">
           {message.images.map((src, index) => (
