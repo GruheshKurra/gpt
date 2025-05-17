@@ -1,521 +1,283 @@
-
-import React, { useState, useRef, useEffect, useCallback } from "react";
-import { useToast } from "@/components/ui/use-toast";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
-import { BotIcon } from "@/components/BotIcon";
-import { ThemeToggle } from "@/components/ThemeToggle";
-import { Settings, Lightbulb, ChevronDown } from "lucide-react";
+import { useState, useRef, useEffect } from "react";
+import ReactMarkdown from "react-markdown";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { useToast } from "@/components/ui/use-toast";
+import { Send, ChevronDown, Loader2, BotIcon, Lightbulb } from "lucide-react";
+import { ThemeToggle } from "@/components/ThemeToggle";
 import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-  SheetTrigger,
-} from "@/components/ui/sheet";
-import { Textarea } from "@/components/ui/textarea";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import ChatMessage from "@/components/ChatMessage";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
-import { useUser, SignInButton, SignUpButton, UserButton } from "@clerk/clerk-react";
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 interface Message {
   id: string;
   role: "user" | "assistant" | "system";
   content: string;
-  images?: string[];
   reasoning?: boolean;
   reasoningSteps?: string;
-  isReasoningExpanded?: boolean;
 }
 
-interface Model {
-  id: string;
-  name: string;
-  description: string;
-  category: string;
-  character_limit: number;
-  reasoning: boolean;
-}
+const API_KEY = "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";
 
-const API_KEY = process.env.NEXT_PUBLIC_AI_API_KEY;
-const MODEL = process.env.NEXT_PUBLIC_AI_MODEL;
+const SYSTEM_PROMPT = `You are a helpful, respectful and honest assistant. Always approach questions thoughtfully and provide accurate, well-reasoned responses.`;
+
+const REASONING_PROMPT = `Before responding, I want you to think step-by-step about the problem or query. Label your thinking process under a "### My Reasoning Process:" heading. After completing your reasoning process, provide your final answer under a "### Answer:" heading. The reasoning process should show your detailed analysis, while the answer should be clear and concise.`;
+
+const MODELS = [
+  {
+    name: "DeepSeek R1 (Best for Reasoning)",
+    id: "deepseek/deepseek-r1:free",
+    context: 163840,
+    capabilities: { reasoning: true }
+  },
+  {
+    name: "Llama 3.3 70B (Best Overall)",
+    id: "meta-llama/llama-3.3-70b-instruct:free",
+    context: 131072
+  },
+  {
+    name: "Nemotron Ultra 253B (Very Large)",
+    id: "nvidia/llama-3.1-nemotron-ultra-253b-v1:free",
+    context: 131072
+  },
+  {
+    name: "Llama 3.1 405B (Largest)",
+    id: "meta-llama/llama-3.1-405b:free",
+    context: 64000
+  }
+];
 
 const Chat = () => {
-  const { isSignedIn, user } = useUser();
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [selectedModel, setSelectedModel] = useState<string>("meta-llama/llama-3.3-70b-instruct:free");
-  const [isMobileSettingsOpen, setIsMobileSettingsOpen] = useState(false);
-  const [isModelSelectorOpen, setIsModelSelectorOpen] = useState(false);
-  const [isQuickModelSelectorOpen, setIsQuickModelSelectorOpen] = useState(false);
-  const [modelSearchTerm, setModelSearchTerm] = useState("");
   const [reasoningEnabled, setReasoningEnabled] = useState(false);
-  const [autoEnableReasoning, setAutoEnableReasoning] = useState(true);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLTextAreaElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
-  const [expandedCategories, setExpandedCategories] = useState<Record<string, boolean>>({
-    Popular: true,
-    Small: false,
-    Large: false,
-    Reasoning: false,
-    Code: false,
-    Other: false
-  });
 
-  const models: Model[] = [
-    {
-      id: "meta-llama/llama-3.3-70b-instruct:free",
-      name: "Llama 3 70B",
-      description: "The most powerful open LLM. Great for almost all tasks.",
-      category: "Popular",
-      character_limit: 3000,
-      reasoning: true,
-    },
-    {
-      id: "meta-llama/llama-3.3-8b-instruct:free",
-      name: "Llama 3 8B",
-      description: "A smaller, faster model. Good for simple tasks.",
-      category: "Small",
-      character_limit: 4000,
-      reasoning: true,
-    },
-    {
-      id: "mistralai/Mistral-7B-Instruct-v0.2:free",
-      name: "Mistral 7B",
-      description: "A small, fast model. Good for simple tasks.",
-      category: "Small",
-      character_limit: 4000,
-      reasoning: false,
-    },
-    {
-      id: "mistralai/Mixtral-8x22B-Instruct-v0.1:free",
-      name: "Mixtral 8x22B",
-      description: "A high-quality model that can handle complex tasks.",
-      category: "Large",
-      character_limit: 2000,
-      reasoning: true,
-    },
-    {
-      id: "NousResearch/Nous-Hermes-2-Mixtral-8x22B-DPO:free",
-      name: "Nous Hermes 2",
-      description: "An uncensored model that is good for creative tasks.",
-      category: "Other",
-      character_limit: 2000,
-      reasoning: true,
-    },
-    {
-      id: "codellama/CodeLlama-34b-Instruct:free",
-      name: "Code Llama 34B",
-      description: "A model that is good for generating and understanding code.",
-      category: "Code",
-      character_limit: 2000,
-      reasoning: true,
-    },
-    {
-      id: "teknium/OpenHermes-2.5-Mistral-7B:free",
-      name: "OpenHermes 2.5",
-      description: "A model that is good at reasoning and following instructions.",
-      category: "Reasoning",
-      character_limit: 3000,
-      reasoning: true,
-    },
-  ];
+  const selectedModelObject = MODELS.find(model => model.id === selectedModel);
+  const hasReasoningCapability = selectedModelObject?.capabilities?.reasoning || false;
 
-  const selectedModelData = models.find((model) => model.id === selectedModel);
-  const selectedModelName = selectedModelData?.name || "Llama 3 70B";
-  const selectedModelCharacterLimit = selectedModelData?.character_limit || 3000;
-  const hasReasoningCapability = selectedModelData?.reasoning || false;
-
-  const filteredModels = models.filter((model) =>
-    model.name.toLowerCase().includes(modelSearchTerm.toLowerCase())
-  );
-
-  const handleCategoryToggle = (category: string) => {
-    setExpandedCategories((prev) => ({
-      ...prev,
-      [category]: !prev[category],
-    }));
-  };
-
-  const scrollToBottom = useCallback(() => {
+  const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, []);
+  };
 
   useEffect(() => {
     scrollToBottom();
-  }, [messages, scrollToBottom]);
+  }, [messages]);
 
-  const sendMessage = async () => {
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
     if (!input.trim() || isLoading) return;
 
-    const userMessage: Message = {
-      id: Date.now().toString(),
-      role: "user",
+    const userMessage: Message = { 
+      id: Date.now().toString(), 
+      role: "user", 
       content: input,
+      reasoning: reasoningEnabled
     };
-
+    
     setMessages((prev) => [...prev, userMessage]);
     setInput("");
     setIsLoading(true);
 
     try {
-      const response = await fetch("/api/ai", {
+      let systemMessage = SYSTEM_PROMPT;
+      if (reasoningEnabled) {
+        systemMessage = `${SYSTEM_PROMPT}\n\n${REASONING_PROMPT}`;
+      }
+      
+      const apiMessages = [
+        { role: "system", content: systemMessage },
+        ...messages.filter(msg => msg.role !== "system").map(({ role, content }) => {
+          return { role, content };
+        }),
+      ];
+      
+      apiMessages.push({ role: userMessage.role, content: userMessage.content });
+
+      const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          "Authorization": `Bearer ${API_KEY}`,
+          "HTTP-Referer": window.location.origin,
+          "X-Title": "AI Chat Assistant"
         },
         body: JSON.stringify({
           model: selectedModel,
-          prompt: input,
-          reasoning: reasoningEnabled,
-        }),
+          messages: apiMessages,
+          temperature: reasoningEnabled ? 0.7 : 0.9,
+          max_tokens: 4000
+        })
       });
 
       if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+        throw new Error(`Error: ${response.status}`);
       }
 
       const data = await response.json();
-      const aiMessage: Message = {
-        id: Date.now().toString() + "-ai",
-        role: "assistant",
-        content: data.response,
-        reasoning: data.reasoning,
-        reasoningSteps: data.reasoning_steps,
-        isReasoningExpanded: false,
-      };
-
-      setMessages((prev) => [...prev, aiMessage]);
-
-      if (autoEnableReasoning && data.reasoning) {
-        setReasoningEnabled(true);
+      const content = data.choices[0].message.content;
+      
+      let finalContent = content;
+      let reasoningSteps = "";
+      
+      if (reasoningEnabled && content.includes("### My Reasoning Process:") && content.includes("### Answer:")) {
+        const reasoningMatch = content.match(/### My Reasoning Process:([\s\S]*?)### Answer:/);
+        const answerMatch = content.match(/### Answer:([\s\S]*)/);
+        
+        if (reasoningMatch && answerMatch) {
+          reasoningSteps = reasoningMatch[1].trim();
+          finalContent = answerMatch[1].trim();
+        }
       }
-    } catch (error: any) {
-      console.error("Failed to fetch AI response:", error);
+      
+      const assistantMessage: Message = { 
+        id: Date.now().toString(), 
+        role: "assistant", 
+        content: finalContent,
+        reasoning: reasoningEnabled,
+        reasoningSteps: reasoningSteps
+      };
+      
+      setMessages((prev) => [...prev, assistantMessage]);
+    } catch (error) {
+      console.error("Error calling OpenRouter API:", error);
       toast({
-        title: "Something went wrong.",
-        description: error.message,
-        variant: "destructive",
+        title: "Error",
+        description: "Failed to get a response from the AI. Please try again.",
+        variant: "destructive"
       });
     } finally {
       setIsLoading(false);
-      inputRef.current?.focus();
+      setTimeout(() => inputRef.current?.focus(), 100);
     }
-  };
-
-  const handleKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (event.key === "Enter" && !event.shiftKey) {
-      event.preventDefault();
-      sendMessage();
-    }
-  };
-
-  const clearChat = () => {
-    setMessages([]);
-  };
-
-  const toggleReasoning = (id: string) => {
-    setMessages((prevMessages) =>
-      prevMessages.map((msg) =>
-        msg.id === id ? { ...msg, isReasoningExpanded: !msg.isReasoningExpanded } : msg
-      )
-    );
-  };
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    sendMessage();
   };
 
   return (
     <div className="flex flex-col h-screen bg-background">
-      <header className="hidden md:flex justify-between items-center p-4 border-b bg-card">
-        <div className="w-full max-w-7xl mx-auto flex justify-between items-center px-4">
+      <header className="flex justify-between items-center p-4 border-b bg-card">
+        <div className="w-full max-w-3xl mx-auto flex justify-between items-center px-4">
           <div className="flex items-center gap-2">
             <BotIcon className="w-6 h-6 text-primary" />
             <h1 className="text-xl font-bold">AI Chat Assistant</h1>
           </div>
-          <div className="flex items-center gap-4">
-            <Dialog open={isModelSelectorOpen} onOpenChange={setIsModelSelectorOpen}>
-              <DialogTrigger asChild>
-                <Button variant="outline" className="flex justify-between items-center gap-2 w-[250px]">
-                  <span className="truncate">{selectedModelName}</span>
-                  <ChevronDown className="h-4 w-4 flex-shrink-0" />
-                </Button>
-              </DialogTrigger>
-              <DialogContent>
-                <DialogHeader>
-                  <DialogTitle>Select a Model</DialogTitle>
-                  <DialogDescription>
-                    Choose the AI model that best suits your needs.
-                  </DialogDescription>
-                </DialogHeader>
-                <Input
-                  type="search"
-                  placeholder="Search models..."
-                  className="my-4"
-                  value={modelSearchTerm}
-                  onChange={(e) => setModelSearchTerm(e.target.value)}
-                />
-                <ScrollArea className="h-[400px] w-full rounded-md border">
-                  <div className="p-3">
-                    {Object.keys(expandedCategories).map((category) => (
-                      <div key={category} className="mb-4">
-                        <div
-                          className="flex items-center justify-between py-2 cursor-pointer"
-                          onClick={() => handleCategoryToggle(category)}
-                        >
-                          <h2 className="text-sm font-semibold">{category}</h2>
-                          <ChevronDown
-                            className={`h-4 w-4 transition-transform ${expandedCategories[category] ? "rotate-180" : ""
-                              }`}
-                          />
-                        </div>
-                        {expandedCategories[category] && (
-                          <ul>
-                            {filteredModels
-                              .filter((model) => model.category === category)
-                              .map((model) => (
-                                <li key={model.id} className="py-2">
-                                  <label
-                                    className="flex items-center p-2 rounded-md hover:bg-secondary cursor-pointer"
-                                  >
-                                    <input
-                                      type="radio"
-                                      name="model"
-                                      value={model.id}
-                                      className="mr-2"
-                                      checked={selectedModel === model.id}
-                                      onChange={() => {
-                                        setSelectedModel(model.id);
-                                        setIsModelSelectorOpen(false);
-                                      }}
-                                    />
-                                    <div className="space-y-1 leading-none">
-                                      <p className="text-sm font-medium">{model.name}</p>
-                                      <p className="text-sm text-muted-foreground">
-                                        {model.description}
-                                      </p>
-                                    </div>
-                                  </label>
-                                </li>
-                              ))}
-                          </ul>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                </ScrollArea>
-              </DialogContent>
-            </Dialog>
-            
+          <div className="flex items-center gap-3">
+            <Select value={selectedModel} onValueChange={setSelectedModel}>
+              <SelectTrigger className="w-[200px]">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {MODELS.map((model) => (
+                  <SelectItem key={model.id} value={model.id}>
+                    {model.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
             {hasReasoningCapability && (
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <div className="flex items-center gap-2">
-                      <Switch 
-                        id="reasoning-mode" 
-                        checked={reasoningEnabled}
-                        onCheckedChange={setReasoningEnabled}
-                      />
-                      <Label htmlFor="reasoning-mode" className="flex items-center gap-1">
-                        <Lightbulb className="h-4 w-4" />
-                        <span className="hidden sm:inline">Reasoning</span>
-                      </Label>
-                    </div>
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    <p>Enable deeper reasoning for complex questions</p>
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
+              <Button
+                variant={reasoningEnabled ? "default" : "outline"}
+                size="sm"
+                onClick={() => setReasoningEnabled(!reasoningEnabled)}
+                className="flex items-center gap-1"
+              >
+                <Lightbulb className="h-4 w-4" />
+                <span className="hidden sm:inline">{reasoningEnabled ? "Disable" : "Enable"} Reasoning</span>
+              </Button>
             )}
-            
-            <Button variant="outline" size="sm" onClick={clearChat}>Clear Chat</Button>
             <ThemeToggle />
-            
-            {!isSignedIn ? (
-              <div className="flex items-center gap-2">
-                <SignInButton mode="modal">
-                  <Button variant="outline" size="sm">Log in</Button>
-                </SignInButton>
-                <SignUpButton mode="modal">
-                  <Button size="sm">Sign up</Button>
-                </SignUpButton>
-              </div>
-            ) : (
-              <UserButton afterSignOutUrl="/" />
-            )}
           </div>
         </div>
       </header>
 
-      <header className="md:hidden flex justify-between items-center p-3 border-b bg-card sticky top-0 z-10">
-        <div className="flex items-center gap-2">
-          <BotIcon className="w-5 h-5 text-primary" />
-          <h1 className="text-lg font-bold">AI Chat Assistant</h1>
-        </div>
-        <div className="flex items-center gap-2">
-          <Dialog open={isQuickModelSelectorOpen} onOpenChange={setIsQuickModelSelectorOpen}>
-            <DialogTrigger asChild>
-              <Button variant="outline" size="sm" className="flex items-center gap-1 px-2 py-1 h-8">
-                <span className="text-sm truncate max-w-[100px]">{selectedModelName}</span>
-                <ChevronDown className="h-3 w-3 flex-shrink-0" />
-              </Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Select a Model</DialogTitle>
-              </DialogHeader>
-              <ScrollArea className="h-[200px] sm:h-[400px] w-full rounded-md border">
-                <div className="p-3">
-                  {models.map((model) => (
-                    <div key={model.id} className="mb-2">
-                      <label className="flex items-center p-2 rounded-md hover:bg-secondary cursor-pointer">
-                        <input
-                          type="radio"
-                          name="model"
-                          value={model.id}
-                          className="mr-2"
-                          checked={selectedModel === model.id}
-                          onChange={() => {
-                            setSelectedModel(model.id);
-                            setIsQuickModelSelectorOpen(false);
-                          }}
-                        />
-                        <div className="space-y-1 leading-none">
-                          <p className="text-sm font-medium">{model.name}</p>
-                          <p className="text-sm text-muted-foreground">{model.description}</p>
-                        </div>
-                      </label>
-                    </div>
-                  ))}
-                </div>
-              </ScrollArea>
-            </DialogContent>
-          </Dialog>
-          
-          {hasReasoningCapability && (
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button 
-                    variant={reasoningEnabled ? "default" : "outline"} 
-                    size="icon" 
-                    className="h-8 w-8 p-0"
-                    onClick={() => setReasoningEnabled(!reasoningEnabled)}
-                  >
-                    <Lightbulb className="h-4 w-4" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>
-                  <p>{reasoningEnabled ? "Disable" : "Enable"} reasoning</p>
-                </TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
-          )}
-          
-          <Sheet open={isMobileSettingsOpen} onOpenChange={setIsMobileSettingsOpen}>
-            <SheetTrigger asChild>
-              <Button variant="outline" size="sm" className="h-8 w-8 p-0">
-                <Settings className="h-4 w-4" />
-              </Button>
-            </SheetTrigger>
-            <SheetContent side="right" className="w-[85vw] sm:w-[350px]">
-              <SheetHeader>
-                <SheetTitle>Settings</SheetTitle>
-              </SheetHeader>
-              <div className="py-4 space-y-4">
-                <div className="space-y-2">
-                  <h3 className="text-sm font-medium">Reasoning Mode</h3>
-                  <p className="text-sm text-muted-foreground">
-                    Enable deeper reasoning for complex questions.
-                  </p>
-                  <div className="flex items-center justify-between rounded-md border p-3 shadow-sm">
-                    <Label htmlFor="auto-enable-reasoning" className="flex items-center gap-1">
-                      Auto-Enable Reasoning
-                    </Label>
-                    <Switch
-                      id="auto-enable-reasoning"
-                      checked={autoEnableReasoning}
-                      onCheckedChange={setAutoEnableReasoning}
-                    />
+      <main className="flex-1 overflow-hidden flex flex-col">
+        <div className="flex-1 overflow-y-auto scroll-smooth">
+          <div className="w-full max-w-3xl mx-auto">
+            <div className="flex-1 space-y-6 p-4 md:p-6">
+              {messages.length === 0 ? (
+                <div className="flex h-[60vh] flex-col items-center justify-center text-center">
+                  <div className="rounded-full bg-primary/10 p-4 mb-4">
+                    <BotIcon className="h-12 w-12 text-primary" />
                   </div>
+                  <h3 className="text-2xl font-semibold mb-2">Welcome to AI Chat Assistant</h3>
+                  <p className="text-muted-foreground">Ask me anything - I'm here to help!</p>
                 </div>
-                
-                <div className="border-t pt-4 mt-4">
-                  <h3 className="text-sm font-medium mb-3">Account</h3>
-                  {!isSignedIn ? (
-                    <div className="flex flex-col gap-2">
-                      <SignInButton mode="modal">
-                        <Button variant="outline" className="w-full">Log in</Button>
-                      </SignInButton>
-                      <SignUpButton mode="modal">
-                        <Button className="w-full">Sign up</Button>
-                      </SignUpButton>
+              ) : (
+                messages.map((message) => (
+                  <div key={message.id} className="flex items-start gap-4 animate-fade-in">
+                    <div className={`flex-1 rounded-lg px-4 py-3 ${
+                      message.role === "user" 
+                        ? "bg-primary text-primary-foreground ml-12" 
+                        : "bg-card border border-border mr-12"
+                    }`}>
+                      <div className="prose dark:prose-invert prose-sm max-w-none">
+                        <ReactMarkdown>
+                          {message.content}
+                        </ReactMarkdown>
+                        {message.reasoningSteps && (
+                          <div className="mt-4 pt-4 border-t border-border">
+                            <div className="flex items-center gap-2 text-amber-500 text-sm font-medium mb-2">
+                              <Lightbulb className="h-4 w-4" />
+                              <span>Reasoning Process</span>
+                            </div>
+                            <div className="text-sm text-muted-foreground">
+                              <ReactMarkdown>
+                                {message.reasoningSteps}
+                              </ReactMarkdown>
+                            </div>
+                          </div>
+                        )}
+                      </div>
                     </div>
-                  ) : (
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm">{user?.fullName}</span>
-                      <UserButton afterSignOutUrl="/" />
-                    </div>
-                  )}
+                  </div>
+                ))
+              )}
+              {isLoading && (
+                <div className="flex items-center justify-center gap-2 text-muted-foreground py-4">
+                  <Loader2 className="h-5 w-5 animate-spin text-primary" />
+                  <span>{reasoningEnabled ? "AI is thinking deeply..." : "AI is thinking..."}</span>
                 </div>
-              </div>
-            </SheetContent>
-          </Sheet>
+              )}
+              <div ref={messagesEndRef} />
+            </div>
+          </div>
         </div>
-      </header>
 
-      <main className="flex-1 overflow-auto p-4">
-        <div className="w-full max-w-4xl mx-auto">
-          {messages.map((message) => (
-            <ChatMessage
-              key={message.id}
-              message={message}
-              onToggleReasoning={toggleReasoning}
-            />
-          ))}
-          <div ref={messagesEndRef} />
+        <div className="border-t bg-card p-4">
+          <div className="w-full max-w-3xl mx-auto">
+            <form onSubmit={handleSubmit} className="relative">
+              <Input
+                ref={inputRef}
+                placeholder="Type your message..."
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                className="pr-12 py-6 text-base"
+                disabled={isLoading}
+              />
+              <Button 
+                type="submit" 
+                disabled={isLoading || !input.trim()}
+                className="absolute right-2 top-1/2 transform -translate-y-1/2 h-9 w-9 p-0"
+                size="icon"
+              >
+                {isLoading ? (
+                  <Loader2 className="h-5 w-5 animate-spin" />
+                ) : (
+                  <Send className="h-5 w-5" />
+                )}
+                <span className="sr-only">Send</span>
+              </Button>
+            </form>
+          </div>
         </div>
       </main>
-
-      <footer className="p-4 border-t bg-card">
-        <div className="w-full max-w-4xl mx-auto flex items-center">
-          <Textarea
-            ref={inputRef}
-            rows={1}
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={handleKeyDown}
-            placeholder="Type your message here..."
-            className="resize-none flex-1 rounded-md border-0 bg-transparent py-2 pl-0 pr-3 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
-          />
-          <Button onClick={sendMessage} disabled={isLoading}>
-            {isLoading ? "Sending..." : "Send"}
-          </Button>
-        </div>
-      </footer>
     </div>
   );
 };
